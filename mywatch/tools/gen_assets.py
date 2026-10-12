@@ -1,0 +1,153 @@
+"""Generate dial background, dot icons and battery pie icons into build/files/icons."""
+import math, os, subprocess, sys
+from PIL import Image, ImageChops, ImageDraw
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ICONS = os.path.join(ROOT, 'build/files/icons')
+COMPRESS = os.path.join(ROOT, '../sdk/tools/image_compress.py')
+S = 4  # supersample, then threshold (display has no alpha blending)
+
+
+def finish(img, size, name):
+    """Box-downsample (no half-pixel shift), hard alpha threshold, write RLE icon."""
+    img = img.resize((size, size), Image.BOX)
+    img.putalpha(img.getchannel('A').point(lambda a: 255 if a >= 128 else 0))
+    png = '/tmp/%s.png' % name
+    img.save(png)
+    subprocess.check_call([sys.executable, COMPRESS, '-i', png, '-o', os.path.join(ICONS, name), '-w', str(size), '-h', str(size), '-f', 'rle'])
+
+
+def battery_icon(size, name, level):
+    """Filled disc with a wedge cut out for the missing charge (clockwise from 12 o'clock)."""
+    big = size * S
+    img = Image.new('RGBA', (big, big), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    w = (255, 255, 255, 255)
+    if level >= 1:
+        d.ellipse([0, 0, big, big], fill=w)
+    elif level > 0:
+        d.pieslice([0, 0, big, big], -90, -90 + 360 * level, fill=w)
+    else:
+        d.ellipse([0, 0, big, big], outline=w, width=S * 2)  # empty: keep a ring so something shows
+    finish(img, size, name)
+
+
+# Icon boxes are centred on the dial at TICK_R and must stay inside the 240 px display (no negative
+# layout coordinates): 30 px normally, 50 px between 5 and 7 o'clock where the tick reaches further in.
+TICK_R = 105
+RIM = 117          # outer end of every tick
+BANNER_DEPTH = 20  # px the notification banner covers at the bottom of the dial (measured on a photo)
+BANNER_GAP = 6
+BASE_IN = {'H': 105, 'M': 93}  # inner end of a normal hour (short) / minute (long) tick
+
+
+def tick_box(angle):
+    return 50 if 150 <= angle <= 210 else 30
+
+
+def tick_inner(kind, angle):
+    r_in = BASE_IN[kind]
+    c = math.cos(math.radians(angle))
+    if 150 <= angle <= 210 and c < 0:  # between 5 and 7 o'clock the banner hides the rim: reach further in
+        r_in = min(r_in, (120 - BANNER_DEPTH - BANNER_GAP) / -c)
+    return max(r_in, TICK_R - tick_box(angle) / 2 + 2)
+
+
+def tick_icon(name, kind, angle):
+    box = tick_box(angle)
+    big = box * S
+    img = Image.new('RGBA', (big, big), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    a = math.radians(angle)
+    ux, uy = math.sin(a), -math.cos(a)
+    c = big / 2
+    r0, r1 = (tick_inner(kind, angle) - TICK_R) * S, (RIM - TICK_R) * S
+    d.line([c + ux * r0, c + uy * r0, c + ux * r1, c + uy * r1], fill=(255, 255, 255, 255), width=3 * S)
+    if kind == 'H':  # small dot (6 px) capping the inner end of the hour tick
+        dx, dy = c + ux * (r0 - 2 * S), c + uy * (r0 - 2 * S)
+        d.ellipse([dx - 3 * S, dy - 3 * S, dx + 3 * S, dy + 3 * S], fill=(255, 255, 255, 255))
+    finish(img, box, name)
+
+
+SMALL = 10      # box of the small "minutes before the event" tick
+SMALL_R = 115   # its centre on the dial
+SMALL_LEN = 5   # px tall, ends on the rim
+
+
+def small_tick_icon(name, angle):
+    big = SMALL * S
+    img = Image.new('RGBA', (big, big), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    a = math.radians(angle)
+    ux, uy = math.sin(a), -math.cos(a)
+    c = big / 2
+    r0, r1 = (RIM - SMALL_LEN - SMALL_R) * S, (RIM - SMALL_R) * S
+    d.line([c + ux * r0, c + uy * r0, c + ux * r1, c + uy * r1], fill=(255, 255, 255, 255), width=2 * S)
+    finish(img, SMALL, name)
+
+
+GREY = 170  # the single shadow grey (2-bit display: 0 / 85 / 170 / 255)
+
+
+def shadowed(draw_shape, w, h):
+    """White shape with a one-grey inner shadow along its top and top-left edge. Returns an RGBA image of w x h."""
+    bw, bh = w * S, h * S
+    mask = Image.new('L', (bw, bh), 0)
+    draw_shape(ImageDraw.Draw(mask), 255)
+    lit = Image.new('L', (bw, bh), 0)
+    lit.paste(mask, (int(1.5 * S), 3 * S))  # same shape moved down-right (no wrap-around)
+    crescent = ImageChops.subtract(mask, lit)             # remains on the top / top-left rim
+    shade = Image.new('L', (bw, bh), 255)
+    shade.paste(GREY, mask=crescent)
+    img = Image.merge('RGBA', (shade, shade, shade, mask)).resize((w, h), Image.BOX)
+    r, g, b, a = img.split()
+    q = lambda v: GREY if v < (GREY + 255) // 2 else 255
+    return Image.merge('RGBA', (r.point(q), g.point(q), b.point(q), a.point(lambda v: 255 if v >= 128 else 0)))
+
+
+def widget_bubble(name, size=76):
+    img = shadowed(lambda d, f: d.ellipse([S, S, size * S - S, size * S - S], fill=f), size, size)
+    png = '/tmp/%s.png' % name
+    img.save(png)
+    subprocess.check_call([sys.executable, COMPRESS, '-i', png, '-o', os.path.join(ICONS, name), '-w', str(size), '-h', str(size), '-f', 'rle'])
+
+
+def distance_icon(name, size=24):
+    """Side-view sneaker, toe to the right."""
+    big = size * S
+    img = Image.new('RGBA', (big, big), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    w = (255, 255, 255, 255)
+    cut = (0, 0, 0, 0)
+    pts = [(2, 5), (9, 5), (10, 9), (14, 11), (19, 13), (22, 16), (22, 20), (2, 20)]
+    d.polygon([(x * S, y * S) for x, y in pts], fill=w)
+    d.line([(2 * S, 17 * S), (22 * S, 17 * S)], fill=cut, width=S)      # sole line
+    for x in (11, 14, 17):                                              # laces
+        d.line([(x * S, (8 + (x - 11) * 0.7) * S), ((x + 2) * S, (11 + (x - 11) * 0.7) * S)], fill=cut, width=S)
+    finish(img, size, name)
+
+
+DATE_BOX = (157, 106, 70, 28)  # x, y, w, h of the rounded rectangle behind the date
+
+
+def background():
+    img = Image.new('RGB', (240, 240), (0, 0, 0))
+    d = ImageDraw.Draw(img)
+    d.ellipse([2, 2, 237, 237], outline=(255, 255, 255), width=2)
+    box = shadowed(lambda dd, f: dd.rounded_rectangle([0, 0, DATE_BOX[2] * S, DATE_BOX[3] * S], radius=8 * S, fill=f), DATE_BOX[2], DATE_BOX[3])
+    img.paste(box.convert('RGB'), (DATE_BOX[0], DATE_BOX[1]), box.getchannel('A'))
+    png = '/tmp/bg.png'
+    img.save(png)
+    subprocess.check_call([sys.executable, COMPRESS, '-i', png, '-o', os.path.join(ICONS, 'background.raw'), '-w', '240', '-h', '240', '-f', 'raw'])
+
+
+os.makedirs(ICONS, exist_ok=True)
+background()
+for i in range(60):
+    tick_icon('icTkH%d' % i, 'H', i * 6)  # hour: short
+    tick_icon('icTkM%d' % i, 'M', i * 6)  # minute: long
+    small_tick_icon('icTkS%d' % i, i * 6)  # the 5 minutes before the event
+widget_bubble('bgCircle')
+distance_icon('icDist')
+for i in range(9):
+    battery_icon(48, 'icPie%d' % i, i / 8)

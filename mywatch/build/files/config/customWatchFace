@@ -1,0 +1,71 @@
+{
+ "layout": [
+  {
+   "type": "image",
+   "name": "background.raw",
+   "size": {
+    "w": 240,
+    "h": 240
+   },
+   "pos": {
+    "x": 120,
+    "y": 120
+   }
+  },
+  {
+   "type": "comp",
+   "name": "widgetEvent",
+   "goal_ring": false,
+   "color": "white",
+   "size": {
+    "w": 240,
+    "h": 240
+   },
+   "pos": {
+    "x": 120,
+    "y": 120
+   }
+  },
+  {
+   "type": "comp",
+   "name": "widgetWeather",
+   "goal_ring": false,
+   "color": "black",
+   "size": {
+    "w": 76,
+    "h": 76
+   },
+   "pos": {
+    "x": 52,
+    "y": 120
+   },
+   "bg": "bgCircle"
+  },
+  {
+   "type": "comp",
+   "name": "widgetDistance",
+   "goal_ring": false,
+   "color": "black",
+   "size": {
+    "w": 76,
+    "h": 76
+   },
+   "pos": {
+    "x": 120,
+    "y": 48
+   },
+   "bg": "bgCircle"
+  }
+ ],
+ "config": {
+  "timeout_display_full": 3600000,
+  "timeout_display_partial": 900000,
+  "wrist_flick_hands_relative": true,
+  "wrist_flick_duration": 2200,
+  "wrist_flick_move_hour": 360,
+  "wrist_flick_move_minute": -360,
+  "powersave_display": false,
+  "powersave_hands": false,
+  "light_up_on_notification": true
+ }
+}

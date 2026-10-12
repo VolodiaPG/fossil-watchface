@@ -1,0 +1,11 @@
+# third-party checkouts and local toolchain (re-create: see mywatch/Makefile)
+/.venv/
+/jerry21/
+/sdk/
+/gbapps/
+/gb-src/
+/calendar-ref/
+# build output
+/mywatch/*.wapp
+/mywatch/build/files/code/
+.DS_Store
