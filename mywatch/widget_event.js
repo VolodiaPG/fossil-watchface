@@ -84,7 +84,7 @@ return {
         }
         return undefined;
     },
-    // 60 pre-rendered hour tick icons, one every 6 degrees, centred on the dial at the given radius
+    // 60 pre-rendered hour and minute tick icons, one every 6 degrees, centred on the dial at the given radius
     // (30px box at radius 105, 50px between 5 and 7 o'clock; boxes never leave the display: layout coordinates stay >= 0).
     // half = 0 picks the box size.
     place: function(angle, radius, prefix, half) {
@@ -134,7 +134,21 @@ return {
             out.hsz = hp.size;
             out.hx = hp.x;
             out.hy = hp.y;
-            out.ldname = 'icLd' + m;  // minute tick and the 15 lead-in ticks, one overlay image
+            var mp = this.place(m * 6, 105, 'icTkM', 0);
+            out.mname = mp.name;
+            out.msz = mp.size;
+            out.mx = mp.x;
+            out.my = mp.y;
+            // the 15 minutes before the event: 3 images of 5 small ticks
+            for (var g = 0; g < 3; g++) {
+                var first = (((m - 5 * g - 1) % 60) + 60) % 60;  // the group's tick nearest the event
+                var mid = (first - 2) * 6 * Math.PI / 180;
+                var gx = Math.floor(120 + 113 * Math.sin(mid) + 0.5) - 28;
+                var gy = Math.floor(120 - 113 * Math.cos(mid) + 0.5) - 28;
+                out['g' + g + 'name'] = 'icG' + first;
+                out['g' + g + 'x'] = Math.min(Math.max(0, gx), 184);
+                out['g' + g + 'y'] = Math.min(Math.max(0, gy), 184);
+            }
             // location above the rest; without a location the title takes the first line
             var lines = [];
             if (e[4]) {

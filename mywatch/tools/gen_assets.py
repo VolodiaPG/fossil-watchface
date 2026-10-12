@@ -92,31 +92,34 @@ def tick_icon(name, kind, angle):
     finish(img, box, name)
 
 
-# Everything that depends on the event minute is one 240 x 240 transparent overlay per minute: the long minute
-# tick plus the 15 small ticks leading up to it, tapering in three sizes. The watch mixes up its images when a
-# face draws many different ones at once, so the face draws just this overlay and the hour tick.
-LEAD_IN = [(5, 8), (5, 5), (5, 3)]  # (how many ticks, length in px), nearest the event first
+# The 15 minutes before the event are three groups of 5 small ticks, all the same size. The watch mixes up
+# its images when a face draws many different ones at once, and drops text when one image is huge, so each group is
+# a single small image: 3 groups + the hour tick + the minute tick.
+GROUP_BOX = 56      # px, square
+GROUP_R = 113       # radius of the circle the group's middle tick sits on
+GROUP_TICK = 3      # px tall, ending on the rim
 
 
-def lead_overlay(name, minute):
-    big = 240 * S
-    img = Image.new('RGBA', (big, big), (0, 0, 0, 0))
+def group_origin(first_step):
+    """Top-left of the group's box, clamped to the display. The widget computes the same thing."""
+    a = math.radians((first_step - 2) * 6)  # middle tick of the 5
+    ox = int(math.floor(120 + GROUP_R * math.sin(a) + 0.5)) - GROUP_BOX // 2
+    oy = int(math.floor(120 - GROUP_R * math.cos(a) + 0.5)) - GROUP_BOX // 2
+    return min(max(0, ox), 240 - GROUP_BOX), min(max(0, oy), 240 - GROUP_BOX)
+
+
+def group_icon(name, first_step):
+    """5 ticks: first_step, first_step - 1, ... (6 degrees apart), ending on the rim."""
+    box = GROUP_BOX * S
+    img = Image.new('RGBA', (box, box), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
-    white = (255, 255, 255, 255)
-    c = 120 * S
-
-    def tick(angle, r_in, width):
-        a = math.radians(angle)
+    ox, oy = group_origin(first_step)
+    for j in range(5):
+        a = math.radians((first_step - j) * 6)
         ux, uy = math.sin(a), -math.cos(a)
-        d.line([c + ux * r_in * S, c + uy * r_in * S, c + ux * RIM * S, c + uy * RIM * S], fill=white, width=width * S)
-
-    tick(minute * 6, tick_inner('M', minute * 6), 3)
-    k = 1
-    for count, length in LEAD_IN:
-        for _ in range(count):
-            tick((minute - k) * 6, RIM - length, 2)
-            k += 1
-    finish(img, 240, name)
+        pts = [((120 + r * ux - ox) * S, (120 + r * uy - oy) * S) for r in (RIM - GROUP_TICK, RIM)]
+        d.line([pts[0], pts[1]], fill=(255, 255, 255, 255), width=2 * S)
+    finish(img, GROUP_BOX, name)
 
 
 GREY = 170  # the single shadow grey (2-bit display: 0 / 85 / 170 / 255)
@@ -191,7 +194,8 @@ os.makedirs(ICONS, exist_ok=True)
 background()
 for i in range(60):
     tick_icon('icTkH%d' % i, 'H', i * 6)  # hour: short
-    lead_overlay('icLd%d' % i, i)  # minute tick and the 15 minutes before it
+    tick_icon('icTkM%d' % i, 'M', i * 6)  # minute: long
+    group_icon('icG%d' % i, i)  # 5 small ticks, the first one at minute i
 widget_bubble('bgCircle')
 distance_icon('icDist')
 alarm_icon('icAlarm')
