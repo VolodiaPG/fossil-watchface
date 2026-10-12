@@ -61,7 +61,7 @@ return {
         return undefined;
     },
     // 60 pre-rendered tick icons per kind, one every 6 degrees, centred on the dial at the given radius
-    // (hour / minute ticks: 30px box at radius 105, 50px between 5 and 7 o'clock; small ticks: 10px box at radius 115;
+    // (hour / minute ticks: 30px box at radius 105, 50px between 5 and 7 o'clock; small ticks: 12px box at radius 114;
     // boxes never leave the display: layout coordinates stay >= 0). half = 0 picks the hour / minute box size.
     place: function(angle, radius, prefix, half) {
         var step = ((Math.round(angle / 6) % 60) + 60) % 60;
@@ -107,8 +107,8 @@ return {
             out.msz = mp.size;
             out.mx = mp.x;
             out.my = mp.y;
-            for (var k = 1; k <= 5; k++) {  // one small tick for each of the 5 minutes before the event minute
-                var sp = this.place((m - k) * 6, 115, 'icTkS', 5);
+            for (var k = 1; k <= 15; k++) {  // small ticks for the 15 minutes before the event minute: long, middle, short
+                var sp = this.place((m - k) * 6, 114, k <= 5 ? 'icTkB' : (k <= 10 ? 'icTkS' : 'icTkT'), 6);
                 out['s' + k + 'name'] = sp.name;
                 out['s' + k + 'x'] = sp.x;
                 out['s' + k + 'y'] = sp.y;

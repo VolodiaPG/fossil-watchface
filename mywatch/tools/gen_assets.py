@@ -92,19 +92,20 @@ def tick_icon(name, kind, angle):
     finish(img, box, name)
 
 
-SMALL = 10      # box of the small "minutes before the event" tick
-SMALL_R = 115   # its centre on the dial
-SMALL_LEN = 5   # px tall, ends on the rim
+SMALL = 12      # box of a small "minutes before the event" tick
+SMALL_R = 114   # its centre on the dial; the tick ends on the rim
+# prefix -> length in px: nearest 5 minutes get the long one, then the middle one, then the short one
+SMALL_KINDS = {'icTkB': 8, 'icTkS': 5, 'icTkT': 3}
 
 
-def small_tick_icon(name, angle):
+def small_tick_icon(name, angle, length):
     big = SMALL * S
     img = Image.new('RGBA', (big, big), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
     a = math.radians(angle)
     ux, uy = math.sin(a), -math.cos(a)
     c = big / 2
-    r0, r1 = (RIM - SMALL_LEN - SMALL_R) * S, (RIM - SMALL_R) * S
+    r0, r1 = (RIM - length - SMALL_R) * S, (RIM - SMALL_R) * S
     d.line([c + ux * r0, c + uy * r0, c + ux * r1, c + uy * r1], fill=(255, 255, 255, 255), width=2 * S)
     finish(img, SMALL, name)
 
@@ -169,7 +170,8 @@ background()
 for i in range(60):
     tick_icon('icTkH%d' % i, 'H', i * 6)  # hour: short
     tick_icon('icTkM%d' % i, 'M', i * 6)  # minute: long
-    small_tick_icon('icTkS%d' % i, i * 6)  # the 5 minutes before the event
+    for prefix, length in SMALL_KINDS.items():  # the 15 minutes before the event
+        small_tick_icon('%s%d' % (prefix, i), i * 6, length)
 widget_bubble('bgCircle')
 distance_icon('icDist')
 for i in range(9):
