@@ -6,17 +6,20 @@ return {
     persist: {},
     config: {
         events: undefined,
+        alarm: undefined,
     },
     events: [],
+    alarm: 0,  // unix seconds of the phone's next alarm, 0 = none
     handler: function(event, response) {
         if (event.type === 'node_config_update') {
             this.store_events();
+            this.store_alarm();
             this.draw(response);
         } else if ((event.type === 'watch_face_update') || (event.type === 'display_data_updated')) {
             this.draw(response);
         }
     },
-    // Gadgetbridge sends {id,title,desc,start,end,reminders} objects; keep compact [start,end,title,desc]
+    // Pushed by the phone app: [{start, end, title, location, desc}], seconds since epoch. Kept compact as [start, end, title, desc, location]
     store_events: function() {
         var incoming = this.config.events;
         if (incoming === undefined) {
@@ -26,7 +29,7 @@ return {
         try {
             for (var i = 0; i < incoming.length; i++) {
                 var e = incoming[i];
-                list.push([e.start, e.end, String(e.title), e.desc ? String(e.desc) : '']);
+                list.push([e.start, e.end, String(e.title), e.desc ? String(e.desc) : '', e.location ? String(e.location) : '']);
             }
             list.sort(function(a, b) { return a[0] - b[0]; });
         } catch (err) {
@@ -34,6 +37,27 @@ return {
         }
         this.events = list;
         this.config.events = undefined;
+    },
+    store_alarm: function() {
+        if (this.config.alarm !== undefined) {
+            this.alarm = Number(this.config.alarm) || 0;
+            this.config.alarm = undefined;
+        }
+    },
+    // "07:30", or "Dem 07:30" when it rings tomorrow; undefined unless it rings within the next 24 hours
+    next_alarm_text: function() {
+        var now = this.unix_time();
+        if (!(this.alarm > now && this.alarm <= now + 86400)) {
+            return undefined;
+        }
+        var offset = this.tz_offset();
+        var local = this.alarm + offset;
+        var secs = local - 86400 * Math.floor(local / 86400);
+        var hh = Math.floor(secs / 3600);
+        var mm = Math.floor((secs % 3600) / 60);
+        var text = (hh < 10 ? '0' + hh : hh) + ':' + (mm < 10 ? '0' + mm : mm);
+        var tomorrow = Math.floor(local / 86400) > Math.floor((now + offset) / 86400);
+        return tomorrow ? 'Dem ' + text : text;
     },
     unix_time: function() {
         if (get_common().U('OFFSET_UNIX_TIME') != undefined) {
@@ -86,7 +110,9 @@ return {
         var out = {
             json_file: 'event_layout',
             show: false,
-            txt: 'No events today',
+            l1: 'No events or alarms',
+            l2: '',
+            showalarm: false,
             date: this.day_of_week[get_common().day] + ' ' + (d < 10 ? '0' + d : d),
             showbat: soc <= this.battery_show_at_or_below,
             bat: 'icBat' + level,
@@ -113,7 +139,25 @@ return {
                 out['s' + k + 'x'] = sp.x;
                 out['s' + k + 'y'] = sp.y;
             }
-            out.txt = e[3] ? e[3] + ' - ' + e[2] : e[2];
+            // location above the rest; without a location the title takes the first line
+            var lines = [];
+            if (e[4]) {
+                lines.push(e[4]);
+            }
+            lines.push(e[2]);
+            if (e[3]) {
+                lines.push(e[3]);
+            }
+            out.l1 = lines[0];
+            out.l2 = lines.slice(1).join(' - ');
+        } else {
+            var alarm = this.next_alarm_text();
+            if (alarm !== undefined) {
+                out.l1 = '';
+                out.showalarm = true;
+                out.aicon = 'icAlarm';
+                out.atxt = alarm;
+            }
         }
         response.draw = {};
         response.draw[this.node_name] = out;

@@ -1,9 +1,9 @@
-name: Build watchface
+name: Build and release
 
 on:
   push:
     branches: [main]
-    paths: ['mywatch/**', '.github/workflows/build.yml']
+    paths: ['mywatch/**', 'app/**', '.github/workflows/build.yml']
   workflow_dispatch:
     inputs:
       bump:
@@ -25,12 +25,32 @@ env:
   SDK_REF: 21925d962d740b25b76ce85c6fd3caddd4e3dd4c
 
 jobs:
-  build:
+  version:
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.next.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0   # tags are needed to find the last version
+
+      - name: Next version
+        id: next
+        run: |
+          last=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n 1)
+          last=${last:-v0.0.0}
+          IFS=. read -r major minor patch <<< "${last#v}"
+          case "${{ inputs.bump || 'patch' }}" in
+            major) major=$((major + 1)); minor=0; patch=0 ;;
+            minor) minor=$((minor + 1)); patch=0 ;;
+            *)     patch=$((patch + 1)) ;;
+          esac
+          echo "tag=v$major.$minor.$patch" >> "$GITHUB_OUTPUT"
+
+  watchface:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
@@ -59,32 +79,70 @@ jobs:
         working-directory: mywatch
         run: make JERRY="$RUNNER_TEMP/jerry/build/bin/jerry-snapshot" PY=python SDK="$RUNNER_TEMP/sdk"
 
-      - name: Next version
-        id: version
-        run: |
-          last=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n 1)
-          last=${last:-v0.0.0}
-          IFS=. read -r major minor patch <<< "${last#v}"
-          case "${{ inputs.bump || 'patch' }}" in
-            major) major=$((major + 1)); minor=0; patch=0 ;;
-            minor) minor=$((minor + 1)); patch=0 ;;
-            *)     patch=$((patch + 1)) ;;
-          esac
-          echo "tag=v$major.$minor.$patch" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: watchface
+          path: mywatch/eventWatchface.wapp
 
-      - name: Name the file after the version
-        run: cp mywatch/eventWatchface.wapp "eventWatchface-${{ steps.version.outputs.tag }}.wapp"
+  app:
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::Secret ANDROID_KEYSTORE_BASE64 is not set: an APK signed with a throwaway key could not update the installed app."
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+          echo "ANDROID_KEYSTORE_FILE=$RUNNER_TEMP/release.keystore" >> "$GITHUB_ENV"
+
+      - name: Build the phone app
+        working-directory: app
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          version="${{ needs.version.outputs.tag }}"
+          ./gradlew --no-daemon assembleRelease \
+            -PappVersion="${version#v}" -PappVersionCode="${{ github.run_number }}"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: eventWatchface-${{ steps.version.outputs.tag }}
-          path: eventWatchface-${{ steps.version.outputs.tag }}.wapp
+          name: app
+          path: app/build/outputs/apk/release/fossil-feed-release.apk
+
+  release:
+    needs: [version, watchface, app]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Name the files after the version
+        run: |
+          tag="${{ needs.version.outputs.tag }}"
+          mkdir dist
+          cp artifacts/watchface/eventWatchface.wapp "dist/eventWatchface-$tag.wapp"
+          cp artifacts/app/fossil-feed-release.apk "dist/fossil-feed-$tag.apk"
 
       - name: Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${{ steps.version.outputs.tag }}" \
-            "eventWatchface-${{ steps.version.outputs.tag }}.wapp" \
-            --target "$GITHUB_SHA" --generate-notes \
-            --title "${{ steps.version.outputs.tag }}"
+          tag="${{ needs.version.outputs.tag }}"
+          gh release create "$tag" dist/* \
+            --target "$GITHUB_SHA" --generate-notes --title "$tag"

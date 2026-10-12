@@ -154,6 +154,19 @@ def distance_icon(name, size=24):
 DATE_BOX = (141, 106, 70, 28)  # x, y, w, h of the rounded rectangle behind the date
 
 
+def alarm_icon(name, size=20):
+    """Bell."""
+    big = size * S
+    img = Image.new('RGBA', (big, big), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    w = (255, 255, 255, 255)
+    d.pieslice([4 * S, 2 * S, 16 * S, 14 * S], 180, 360, fill=w)               # dome
+    d.polygon([(4 * S, 8 * S), (16 * S, 8 * S), (18 * S, 15 * S), (2 * S, 15 * S)], fill=w)  # flared body
+    d.ellipse([8 * S, 16 * S, 12 * S, 19 * S], fill=w)                         # clapper
+    d.rectangle([9 * S, 0, 11 * S, 3 * S], fill=w)                             # top knob
+    finish(img, size, name)
+
+
 def background():
     img = Image.new('RGB', (240, 240), (0, 0, 0))
     d = ImageDraw.Draw(img)
@@ -174,5 +187,6 @@ for i in range(60):
         small_tick_icon('%s%d' % (prefix, i), i * 6, length)
 widget_bubble('bgCircle')
 distance_icon('icDist')
+alarm_icon('icAlarm')
 for i in range(9):
     battery_indicator('icBat%d' % i, i)
