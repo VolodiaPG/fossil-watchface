@@ -17,22 +17,42 @@ def finish(img, size, name):
     subprocess.check_call([sys.executable, COMPRESS, '-i', png, '-o', os.path.join(ICONS, name), '-w', str(size), '-h', str(size), '-f', 'rle'])
 
 
-BAT_W, BAT_H = 36, 14   # white rounded box, half the date box's height, stuck under it
+BAT_W, BAT_H = 36, 14   # battery tab: half the date box's height
+BAT_R = 8               # same radius as the date box: roundovers where the tab meets it, and the tab's bottom corners
 
 
 def battery_indicator(name, level):
-    """White rounded box (same style as the date box) holding a small black battery, level 0-8."""
-    box = shadowed(lambda d, f: d.rounded_rectangle([0, 0, BAT_W * S, BAT_H * S], radius=4 * S, fill=f), BAT_W, BAT_H)
+    """Tab merged into the bottom of the date box (concave roundovers at the junction), holding a small black battery.
+
+    The union of date box and tab is lit as one shape, then only the part below the date box is kept:
+    it lines up with the date box drawn on the background, so the two read as one piece.
+    """
+    dw, dh = DATE_BOX[2], DATE_BOX[3]
+    x0 = (dw - BAT_W) // 2  # tab left edge inside the date box's width
+    r = BAT_R
+
+    def union(d, f):
+        d.rounded_rectangle([0, 0, dw * S, dh * S], radius=8 * S, fill=f)
+        for left in (True, False):  # fillets: square next to the tab, minus a disc = concave roundover
+            sx = (x0 - r) if left else (x0 + BAT_W)
+            cx = sx if left else sx + r
+            d.rectangle([sx * S, dh * S, (sx + r) * S - 1, (dh + r) * S - 1], fill=f)
+            d.ellipse([(cx - r) * S, (dh + r - r) * S, (cx + r) * S - 1, (dh + r + r) * S - 1], fill=0)
+        d.rounded_rectangle([x0 * S, (dh - 2 * r) * S, (x0 + BAT_W) * S, (dh + BAT_H) * S], radius=r * S, fill=f)
+
+    full = shadowed(union, dw, dh + BAT_H)
+    box = full.crop((x0 - r, dh, x0 + BAT_W + r, dh + BAT_H))  # BAT_W + 2r wide
     d = ImageDraw.Draw(box)
     black = (0, 0, 0, 255)
-    d.rectangle([6, 4, 28, 10], outline=black)   # body 23 x 7
-    d.rectangle([29, 6, 30, 8], fill=black)      # nub
+    ox = r + 6                                   # glyph is centred on the tab
+    d.rectangle([ox, 4, ox + 22, 10], outline=black)  # body 23 x 7
+    d.rectangle([ox + 23, 6, ox + 24, 8], fill=black)  # nub
     fill = (level * 19) // 8                     # inner width 19 px
     if fill:
-        d.rectangle([8, 6, 7 + fill, 8], fill=black)
+        d.rectangle([ox + 2, 6, ox + 1 + fill, 8], fill=black)
     png = '/tmp/%s.png' % name
     box.save(png)
-    subprocess.check_call([sys.executable, COMPRESS, '-i', png, '-o', os.path.join(ICONS, name), '-w', str(BAT_W), '-h', str(BAT_H), '-f', 'rle'])
+    subprocess.check_call([sys.executable, COMPRESS, '-i', png, '-o', os.path.join(ICONS, name), '-w', str(box.width), '-h', str(box.height), '-f', 'rle'])
 
 
 # Icon boxes are centred on the dial at TICK_R and must stay inside the 240 px display (no negative
@@ -130,7 +150,7 @@ def distance_icon(name, size=24):
     finish(img, size, name)
 
 
-DATE_BOX = (157, 106, 70, 28)  # x, y, w, h of the rounded rectangle behind the date
+DATE_BOX = (141, 106, 70, 28)  # x, y, w, h of the rounded rectangle behind the date
 
 
 def background():
