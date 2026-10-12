@@ -84,9 +84,9 @@ return {
         }
         return undefined;
     },
-    // 60 pre-rendered tick icons per kind, one every 6 degrees, centred on the dial at the given radius
-    // (hour / minute ticks: 30px box at radius 105, 50px between 5 and 7 o'clock; small ticks: 12px box at radius 114;
-    // boxes never leave the display: layout coordinates stay >= 0). half = 0 picks the hour / minute box size.
+    // 60 pre-rendered hour tick icons, one every 6 degrees, centred on the dial at the given radius
+    // (30px box at radius 105, 50px between 5 and 7 o'clock; boxes never leave the display: layout coordinates stay >= 0).
+    // half = 0 picks the box size.
     place: function(angle, radius, prefix, half) {
         var step = ((Math.round(angle / 6) % 60) + 60) % 60;
         var a = step * 6 * Math.PI / 180;
@@ -129,22 +129,12 @@ return {
             var h = Math.floor(secs / 3600) % 12;
             var m = Math.floor((secs % 3600) / 60);
             var hp = this.place((h + m / 60) * 30, 105, 'icTkH', 0);
-            var mp = this.place(m * 6, 105, 'icTkM', 0);
             out.show = true;
             out.hname = hp.name;
             out.hsz = hp.size;
             out.hx = hp.x;
             out.hy = hp.y;
-            out.mname = mp.name;
-            out.msz = mp.size;
-            out.mx = mp.x;
-            out.my = mp.y;
-            for (var k = 1; k <= 15; k++) {  // small ticks for the 15 minutes before the event minute: long, middle, short
-                var sp = this.place((m - k) * 6, 114, k <= 5 ? 'icTkB' : (k <= 10 ? 'icTkS' : 'icTkT'), 6);
-                out['s' + k + 'name'] = sp.name;
-                out['s' + k + 'x'] = sp.x;
-                out['s' + k + 'y'] = sp.y;
-            }
+            out.ldname = 'icLd' + m;  // minute tick and the 15 lead-in ticks, one overlay image
             // location above the rest; without a location the title takes the first line
             var lines = [];
             if (e[4]) {

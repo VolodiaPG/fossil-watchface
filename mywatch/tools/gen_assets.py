@@ -92,22 +92,31 @@ def tick_icon(name, kind, angle):
     finish(img, box, name)
 
 
-SMALL = 12      # box of a small "minutes before the event" tick
-SMALL_R = 114   # its centre on the dial; the tick ends on the rim
-# prefix -> length in px: nearest 5 minutes get the long one, then the middle one, then the short one
-SMALL_KINDS = {'icTkB': 8, 'icTkS': 5, 'icTkT': 3}
+# Everything that depends on the event minute is one 240 x 240 transparent overlay per minute: the long minute
+# tick plus the 15 small ticks leading up to it, tapering in three sizes. The watch mixes up its images when a
+# face draws many different ones at once, so the face draws just this overlay and the hour tick.
+LEAD_IN = [(5, 8), (5, 5), (5, 3)]  # (how many ticks, length in px), nearest the event first
 
 
-def small_tick_icon(name, angle, length):
-    big = SMALL * S
+def lead_overlay(name, minute):
+    big = 240 * S
     img = Image.new('RGBA', (big, big), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
-    a = math.radians(angle)
-    ux, uy = math.sin(a), -math.cos(a)
-    c = big / 2
-    r0, r1 = (RIM - length - SMALL_R) * S, (RIM - SMALL_R) * S
-    d.line([c + ux * r0, c + uy * r0, c + ux * r1, c + uy * r1], fill=(255, 255, 255, 255), width=2 * S)
-    finish(img, SMALL, name)
+    white = (255, 255, 255, 255)
+    c = 120 * S
+
+    def tick(angle, r_in, width):
+        a = math.radians(angle)
+        ux, uy = math.sin(a), -math.cos(a)
+        d.line([c + ux * r_in * S, c + uy * r_in * S, c + ux * RIM * S, c + uy * RIM * S], fill=white, width=width * S)
+
+    tick(minute * 6, tick_inner('M', minute * 6), 3)
+    k = 1
+    for count, length in LEAD_IN:
+        for _ in range(count):
+            tick((minute - k) * 6, RIM - length, 2)
+            k += 1
+    finish(img, 240, name)
 
 
 GREY = 170  # the single shadow grey (2-bit display: 0 / 85 / 170 / 255)
@@ -182,9 +191,7 @@ os.makedirs(ICONS, exist_ok=True)
 background()
 for i in range(60):
     tick_icon('icTkH%d' % i, 'H', i * 6)  # hour: short
-    tick_icon('icTkM%d' % i, 'M', i * 6)  # minute: long
-    for prefix, length in SMALL_KINDS.items():  # the 15 minutes before the event
-        small_tick_icon('%s%d' % (prefix, i), i * 6, length)
+    lead_overlay('icLd%d' % i, i)  # minute tick and the 15 minutes before it
 widget_bubble('bgCircle')
 distance_icon('icDist')
 alarm_icon('icAlarm')
