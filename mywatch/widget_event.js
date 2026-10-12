@@ -76,7 +76,7 @@ return {
             y: Math.round(120 - radius * Math.cos(a) - half),
         };
     },
-    battery_show_at_or_below: 100,  // percent; 100 = always visible (testing)
+    battery_show_at_or_below: 30,  // percent: the battery tab shows at or below this level
     day_of_week: ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'],
     draw: function(response) {
         var e = this.next_event();
