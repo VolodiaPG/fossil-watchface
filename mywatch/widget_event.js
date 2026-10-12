@@ -76,17 +76,20 @@ return {
             y: Math.round(120 - radius * Math.cos(a) - half),
         };
     },
+    battery_show_at_or_below: 100,  // percent; 100 = always visible (testing)
     day_of_week: ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'],
     draw: function(response) {
         var e = this.next_event();
         var d = get_common().date;
-        var level = Math.round(get_common().battery_soc * 8 / 100);
+        var soc = get_common().battery_soc;
+        var level = Math.max(0, Math.min(8, Math.round(soc * 8 / 100)));
         var out = {
             json_file: 'event_layout',
             show: false,
             txt: 'No events today',
             date: this.day_of_week[get_common().day] + ' ' + (d < 10 ? '0' + d : d),
-            pie: 'icPie' + Math.max(0, Math.min(8, level)),
+            showbat: soc <= this.battery_show_at_or_below,
+            bat: 'icBat' + level,
         };
         if (e !== undefined) {
             var local = e[0] + this.tz_offset();

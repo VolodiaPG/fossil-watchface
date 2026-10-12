@@ -1,4 +1,4 @@
-"""Generate dial background, dot icons and battery pie icons into build/files/icons."""
+"""Generate dial background, tick, battery and complication icons into build/files/icons."""
 import math, os, subprocess, sys
 from PIL import Image, ImageChops, ImageDraw
 
@@ -17,19 +17,22 @@ def finish(img, size, name):
     subprocess.check_call([sys.executable, COMPRESS, '-i', png, '-o', os.path.join(ICONS, name), '-w', str(size), '-h', str(size), '-f', 'rle'])
 
 
-def battery_icon(size, name, level):
-    """Filled disc with a wedge cut out for the missing charge (clockwise from 12 o'clock)."""
-    big = size * S
-    img = Image.new('RGBA', (big, big), (0, 0, 0, 0))
-    d = ImageDraw.Draw(img)
-    w = (255, 255, 255, 255)
-    if level >= 1:
-        d.ellipse([0, 0, big, big], fill=w)
-    elif level > 0:
-        d.pieslice([0, 0, big, big], -90, -90 + 360 * level, fill=w)
-    else:
-        d.ellipse([0, 0, big, big], outline=w, width=S * 2)  # empty: keep a ring so something shows
-    finish(img, size, name)
+BAT_W, BAT_H = 36, 14   # white rounded box, half the date box's height, stuck under it
+
+
+def battery_indicator(name, level):
+    """White rounded box (same style as the date box) holding a small black battery, level 0-8."""
+    box = shadowed(lambda d, f: d.rounded_rectangle([0, 0, BAT_W * S, BAT_H * S], radius=4 * S, fill=f), BAT_W, BAT_H)
+    d = ImageDraw.Draw(box)
+    black = (0, 0, 0, 255)
+    d.rectangle([6, 4, 28, 10], outline=black)   # body 23 x 7
+    d.rectangle([29, 6, 30, 8], fill=black)      # nub
+    fill = (level * 19) // 8                     # inner width 19 px
+    if fill:
+        d.rectangle([8, 6, 7 + fill, 8], fill=black)
+    png = '/tmp/%s.png' % name
+    box.save(png)
+    subprocess.check_call([sys.executable, COMPRESS, '-i', png, '-o', os.path.join(ICONS, name), '-w', str(BAT_W), '-h', str(BAT_H), '-f', 'rle'])
 
 
 # Icon boxes are centred on the dial at TICK_R and must stay inside the 240 px display (no negative
@@ -150,4 +153,4 @@ for i in range(60):
 widget_bubble('bgCircle')
 distance_icon('icDist')
 for i in range(9):
-    battery_icon(48, 'icPie%d' % i, i / 8)
+    battery_indicator('icBat%d' % i, i)
