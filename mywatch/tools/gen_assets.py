@@ -4,7 +4,7 @@ from PIL import Image, ImageChops, ImageDraw
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ICONS = os.path.join(ROOT, 'build/files/icons')
-COMPRESS = os.path.join(ROOT, '../sdk/tools/image_compress.py')
+COMPRESS = os.path.join(os.environ.get('SDK', os.path.join(ROOT, '../sdk')), 'tools/image_compress.py')
 S = 4  # supersample, then threshold (display has no alpha blending)
 
 

@@ -1,5 +1,8 @@
-JERRY := ../jerry21/build/bin/jerry-snapshot
-PY := ../.venv/bin/python
+# Tool locations, overridable (CI sets them): make JERRY=... PY=... SDK=...
+JERRY ?= ../jerry21/build/bin/jerry-snapshot
+PY ?= ../.venv/bin/python
+SDK ?= ../sdk
+export SDK
 OUT := eventWatchface.wapp
 
 # source file -> code node name
@@ -18,7 +21,7 @@ code:
 	for p in $(CODE); do $(JERRY) generate -f '' $${p%%:*} -o build/files/code/$${p##*:} >/dev/null || exit 1; done
 
 pack:
-	$(PY) ../sdk/tools/pack.py -i build -o $(OUT)
+	$(PY) $(SDK)/tools/pack.py -i build -o $(OUT)
 
 clean:
 	rm -f build/files/code/* $(OUT)
