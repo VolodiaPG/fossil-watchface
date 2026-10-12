@@ -27,12 +27,22 @@ class MainActivity : Activity() {
                 }.start()
             }
         }
+        val test = Button(this).apply {
+            text = "Send longest-text test event"
+            setOnClickListener {
+                Thread {
+                    val line = Pusher.pushTest(this@MainActivity)
+                    runOnUiThread { status.text = line }
+                }.start()
+            }
+        }
         setContentView(LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(pad, pad, pad, pad)
             addView(status)
             addView(grant)
             addView(push)
+            addView(test)
         })
         PushJobService.schedule(this)
     }

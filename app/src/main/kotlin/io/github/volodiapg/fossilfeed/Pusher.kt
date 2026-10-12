@@ -13,6 +13,12 @@ object Pusher {
     private const val GADGETBRIDGE = "nodomain.freeyourgadget.gadgetbridge"
     private const val ACTION_PUSH_CONFIG = "$GADGETBRIDGE.Q_PUSH_CONFIG"
     private const val MAX_EVENTS = 4
+
+    // Text that fits the watch: the location is one line, title and description share up to three lines
+    // (about 20 characters a line). Longer text gets "…" in the middle, so both its start and end stay readable.
+    private const val MAX_LOCATION = 20
+    private const val MAX_TITLE = 26
+    private const val MAX_DESC = 28
     private const val RESEND_AFTER_MS = 6 * 60 * 60 * 1000L
 
     private const val PREFS = "fossilfeed"
@@ -21,11 +27,25 @@ object Pusher {
         ctx.checkSelfPermission(android.Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED
 
     /** The JSON the watchface expects; times are Unix seconds, alarm is 0 when none is set. */
-    fun payload(ctx: Context, nowMs: Long = System.currentTimeMillis()): String {
+    fun payload(ctx: Context, nowMs: Long = System.currentTimeMillis()): String =
+        payloadOf(events(ctx, nowMs), nextAlarmSeconds(ctx))
+
+    private fun payloadOf(events: JSONArray, alarmSeconds: Long): String {
         val set = JSONObject()
-            .put("widgetEvent._.config.events", events(ctx, nowMs))
-            .put("widgetEvent._.config.alarm", nextAlarmSeconds(ctx))
+            .put("widgetEvent._.config.events", events)
+            .put("widgetEvent._.config.alarm", alarmSeconds)
         return JSONObject().put("res", JSONObject().put("set", set)).toString()
+    }
+
+    /** Sends one event with the longest text the watch face is meant to show, to check the layout on the watch. */
+    fun pushTest(ctx: Context): String {
+        val start = System.currentTimeMillis() / 1000 + 5 * 60
+        val event = event(
+            "Quarterly planning review meeting", "Conference room Alpha", "Bring the slides and the laptop charger",
+            start, start + 3600
+        )
+        ctx.sendBroadcast(Intent(ACTION_PUSH_CONFIG).setPackage(GADGETBRIDGE).putExtra("EXTRA_CONFIG_JSON", payloadOf(JSONArray().put(event), 0L)))
+        return "Sent the longest-text test event"
     }
 
     /** Sends the payload unless it is the one already sent recently. Returns a one-line status for the screen. */
@@ -75,14 +95,7 @@ object Pusher {
             val rows = ArrayList<JSONObject>()
             while (c.moveToNext()) {
                 if (c.getInt(5) == 1) continue  // all-day events have no time to show
-                rows.add(
-                    JSONObject()
-                        .put("title", clip(c.getString(0), 60))
-                        .put("location", clip(c.getString(1), 60))
-                        .put("desc", clip(c.getString(2), 80))
-                        .put("start", c.getLong(3) / 1000)
-                        .put("end", c.getLong(4) / 1000)
-                )
+                rows.add(event(c.getString(0), c.getString(1), c.getString(2), c.getLong(3) / 1000, c.getLong(4) / 1000))
             }
             rows.sortBy { it.getLong("start") }
             rows.take(MAX_EVENTS).forEach { out.put(it) }
@@ -90,6 +103,20 @@ object Pusher {
         return out
     }
 
-    private fun clip(text: String?, max: Int): String =
-        (text ?: "").replace(Regex("\\s+"), " ").trim().take(max)
+    private fun event(title: String?, location: String?, desc: String?, startSeconds: Long, endSeconds: Long): JSONObject =
+        JSONObject()
+            .put("title", fit(title, MAX_TITLE))
+            .put("location", fit(location, MAX_LOCATION))
+            .put("desc", fit(desc, MAX_DESC))
+            .put("start", startSeconds)
+            .put("end", endSeconds)
+
+    /** Collapses whitespace, and shortens to [max] characters with "…" in the middle. */
+    internal fun fit(text: String?, max: Int): String {
+        val clean = (text ?: "").replace(Regex("\\s+"), " ").trim()
+        if (clean.length <= max) return clean
+        val keep = max - 1
+        val head = (keep + 1) / 2
+        return clean.take(head) + "\u2026" + clean.takeLast(keep - head)
+    }
 }

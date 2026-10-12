@@ -101,6 +101,10 @@ return {
         };
     },
     battery_show_at_or_below: 30,  // percent: the battery tab shows at or below this level
+    // the text field under the date: lines are centred vertically in it
+    field_top: 152,
+    field_height: 64,
+    line_height: 19,
     day_of_week: ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'],
     draw: function(response) {
         var e = this.next_event();
@@ -113,6 +117,8 @@ return {
             l1: 'No events or alarms',
             l2: '',
             showalarm: false,
+            aiy: 0,
+            aty: 0,
             date: this.day_of_week[get_common().day] + ' ' + (d < 10 ? '0' + d : d),
             showbat: soc <= this.battery_show_at_or_below,
             bat: 'icBat' + level,
@@ -158,6 +164,15 @@ return {
                 out.aicon = 'icAlarm';
                 out.atxt = alarm;
             }
+        }
+        // vertical placement: wrapped lines are estimated from the text length (about 20 characters a line)
+        var rows = (out.l1 ? 1 : 0) + (out.l2 ? Math.min(3, Math.ceil(out.l2.length / 20)) : 0);
+        var top = this.field_top + Math.max(0, Math.round((this.field_height - rows * this.line_height) / 2));
+        out.l1y = top;
+        out.l2y = top + (out.l1 ? this.line_height : 0);
+        if (out.showalarm) {  // one row of 22 px centred in the field; the bell sits 2 px lower than the text row
+            out.aty = this.field_top + Math.round((this.field_height - 22) / 2);
+            out.aiy = out.aty + 2;
         }
         response.draw = {};
         response.draw[this.node_name] = out;
