@@ -15,7 +15,7 @@ object Pusher {
     private const val MAX_EVENTS = 4
 
     // Text that fits the watch: the location is one line, title and description share up to three lines
-    // (about 20 characters a line). Longer text gets "…" in the middle, so both its start and end stay readable.
+    // (about 20 characters a line). Longer text gets "..." in the middle, so both its start and end stay readable.
     private const val MAX_LOCATION = 20
     private const val MAX_TITLE = 26
     private const val MAX_DESC = 28
@@ -111,12 +111,34 @@ object Pusher {
             .put("start", startSeconds)
             .put("end", endSeconds)
 
-    /** Collapses whitespace, and shortens to [max] characters with "…" in the middle. */
+    /**
+     * Plain ASCII, whitespace collapsed, shortened to [max] characters with "..." in the middle.
+     * The watch drops a whole update that contains a non-ASCII character, so accents are removed here.
+     */
     internal fun fit(text: String?, max: Int): String {
-        val clean = (text ?: "").replace(Regex("\\s+"), " ").trim()
+        val clean = ascii(text ?: "").replace(Regex("\\s+"), " ").trim()
         if (clean.length <= max) return clean
-        val keep = max - 1
+        val keep = max - 3
         val head = (keep + 1) / 2
-        return clean.take(head) + "\u2026" + clean.takeLast(keep - head)
+        return clean.take(head) + "..." + clean.takeLast(keep - head)
+    }
+
+    private val replacements = mapOf(
+        '\u2018' to "'", '\u2019' to "'", '\u201C' to "\"", '\u201D' to "\"", '\u2013' to "-", '\u2014' to "-",
+        '\u2026' to "...", '\u00A0' to " ", '\u0153' to "oe", '\u0152' to "OE", '\u00E6' to "ae", '\u00C6' to "AE",
+        '\u00DF' to "ss", '\u20AC' to "EUR",
+    )
+
+    private fun ascii(text: String): String {
+        val unaccented = java.text.Normalizer.normalize(text, java.text.Normalizer.Form.NFD).replace(Regex("\\p{M}+"), "")
+        return buildString {
+            for (ch in unaccented) {
+                when {
+                    ch.code < 128 -> append(ch)
+                    replacements.containsKey(ch) -> append(replacements[ch])
+                    else -> append('?')
+                }
+            }
+        }
     }
 }
