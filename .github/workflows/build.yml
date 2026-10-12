@@ -1,0 +1,85 @@
+name: Build watchface
+
+on:
+  push:
+    branches: [main]
+    paths: ['mywatch/**', '.github/workflows/build.yml']
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Version part to increase
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  JERRYSCRIPT_REF: v2.1.0   # the watch firmware needs exactly this version
+  SDK_REPO: https://github.com/dakhnod/Fossil-HR-SDK.git
+  SDK_REF: 21925d962d740b25b76ce85c6fd3caddd4e3dd4c
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # tags are needed to find the last version
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Fossil HR SDK (pack and image tools)
+        run: |
+          git clone "$SDK_REPO" "$RUNNER_TEMP/sdk"
+          git -C "$RUNNER_TEMP/sdk" checkout "$SDK_REF"
+          pip install pillow crc32c
+
+      - name: JerryScript with snapshot tool
+        run: |
+          git clone --depth 1 --branch "$JERRYSCRIPT_REF" https://github.com/jerryscript-project/jerryscript.git "$RUNNER_TEMP/jerry"
+          cd "$RUNNER_TEMP/jerry"
+          python3 tools/build.py --jerry-cmdline-snapshot ON \
+            --compile-flag=-Wno-error \
+            --cmake-param=-DCMAKE_POLICY_VERSION_MINIMUM=3.5
+
+      - name: Build watchface
+        working-directory: mywatch
+        run: make JERRY="$RUNNER_TEMP/jerry/build/bin/jerry-snapshot" PY=python SDK="$RUNNER_TEMP/sdk"
+
+      - name: Next version
+        id: version
+        run: |
+          last=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n 1)
+          last=${last:-v0.0.0}
+          IFS=. read -r major minor patch <<< "${last#v}"
+          case "${{ inputs.bump || 'patch' }}" in
+            major) major=$((major + 1)); minor=0; patch=0 ;;
+            minor) minor=$((minor + 1)); patch=0 ;;
+            *)     patch=$((patch + 1)) ;;
+          esac
+          echo "tag=v$major.$minor.$patch" >> "$GITHUB_OUTPUT"
+
+      - name: Name the file after the version
+        run: cp mywatch/eventWatchface.wapp "eventWatchface-${{ steps.version.outputs.tag }}.wapp"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eventWatchface-${{ steps.version.outputs.tag }}
+          path: eventWatchface-${{ steps.version.outputs.tag }}.wapp
+
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.version.outputs.tag }}" \
+            "eventWatchface-${{ steps.version.outputs.tag }}.wapp" \
+            --target "$GITHUB_SHA" --generate-notes \
+            --title "${{ steps.version.outputs.tag }}"
