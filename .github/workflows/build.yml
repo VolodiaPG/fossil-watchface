@@ -46,8 +46,13 @@ jobs:
         run: |
           git clone --depth 1 --branch "$JERRYSCRIPT_REF" https://github.com/jerryscript-project/jerryscript.git "$RUNNER_TEMP/jerry"
           cd "$RUNNER_TEMP/jerry"
+          # 2.1.0 turns every warning into an error, which modern compilers do not survive
+          python3 - <<'PY'
+          src = open('CMakeLists.txt').read().replace(' -Werror)', ')')
+          src = ''.join(l for l in src.splitlines(True) if '-Werror=${_warning}' not in l)
+          open('CMakeLists.txt', 'w').write(src)
+          PY
           python3 tools/build.py --jerry-cmdline-snapshot ON \
-            --compile-flag=-Wno-error \
             --cmake-param=-DCMAKE_POLICY_VERSION_MINIMUM=3.5
 
       - name: Build watchface
