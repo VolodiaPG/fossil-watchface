@@ -170,9 +170,9 @@ return {
         var top = this.field_top + Math.max(0, Math.round((this.field_height - rows * this.line_height) / 2));
         out.l1y = top;
         out.l2y = top + (out.l1 ? this.line_height : 0);
-        if (out.showalarm) {  // one row of 22 px centred in the field; the bell sits 2 px lower than the text row
+        if (out.showalarm) {  // one row of 22 px centred in the field; the bell sits 4 px lower than the text row
             out.aty = this.field_top + Math.round((this.field_height - 22) / 2);
-            out.aiy = out.aty + 2;
+            out.aiy = out.aty + 4;
         }
         response.draw = {};
         response.draw[this.node_name] = out;
