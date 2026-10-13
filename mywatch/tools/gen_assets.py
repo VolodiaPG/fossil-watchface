@@ -5,13 +5,18 @@ from PIL import Image, ImageChops, ImageDraw
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ICONS = os.path.join(ROOT, 'build/files/icons')
 COMPRESS = os.path.join(os.environ.get('SDK', os.path.join(ROOT, '../sdk')), 'tools/image_compress.py')
-S = 4  # supersample, then threshold (display has no alpha blending)
+S = 4  # supersample, then reduce to the display's 4 levels of grey and 4 levels of alpha (anti-aliased edges)
+
+
+def level(v):
+    """Nearest of the 4 levels 0 / 85 / 170 / 255 that a 2-bit channel can hold."""
+    return int(round(v / 85.0)) * 85
 
 
 def finish(img, size, name):
-    """Box-downsample (no half-pixel shift), hard alpha threshold, write RLE icon."""
+    """Box-downsample (no half-pixel shift), alpha reduced to 4 levels so edges stay smooth, write RLE icon."""
     img = img.resize((size, size), Image.BOX)
-    img.putalpha(img.getchannel('A').point(lambda a: 255 if a >= 128 else 0))
+    img.putalpha(img.getchannel('A').point(level))
     png = '/tmp/%s.png' % name
     img.save(png)
     subprocess.check_call([sys.executable, COMPRESS, '-i', png, '-o', os.path.join(ICONS, name), '-w', str(size), '-h', str(size), '-f', 'rle'])
@@ -138,7 +143,7 @@ def shadowed(draw_shape, w, h):
     img = Image.merge('RGBA', (shade, shade, shade, mask)).resize((w, h), Image.BOX)
     r, g, b, a = img.split()
     q = lambda v: GREY if v < (GREY + 255) // 2 else 255
-    return Image.merge('RGBA', (r.point(q), g.point(q), b.point(q), a.point(lambda v: 255 if v >= 128 else 0)))
+    return Image.merge('RGBA', (r.point(q), g.point(q), b.point(q), a.point(level)))
 
 
 def widget_bubble(name, size=76):
@@ -196,10 +201,9 @@ def alarm_icon(name, size=20):
 
 def background():
     img = Image.new('RGB', (240, 240), (0, 0, 0))
-    d = ImageDraw.Draw(img)
-    d.ellipse([2, 2, 237, 237], outline=(255, 255, 255), width=2)
     box = shadowed(lambda dd, f: dd.rounded_rectangle([0, 0, DATE_BOX[2] * S, DATE_BOX[3] * S], radius=8 * S, fill=f), DATE_BOX[2], DATE_BOX[3])
-    img.paste(box.convert('RGB'), (DATE_BOX[0], DATE_BOX[1]), box.getchannel('A'))
+    img.paste(box.convert('RGB'), (DATE_BOX[0], DATE_BOX[1]), box.getchannel('A'))  # blended with the alpha: smooth edge
+    img = img.point(level)  # the raw format keeps 2 bits of grey, and cuts the rest off: round first
     png = '/tmp/bg.png'
     img.save(png)
     subprocess.check_call([sys.executable, COMPRESS, '-i', png, '-o', os.path.join(ICONS, 'background.raw'), '-w', '240', '-h', '240', '-f', 'raw'])
