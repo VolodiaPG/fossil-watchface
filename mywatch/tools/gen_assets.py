@@ -97,7 +97,7 @@ def tick_icon(name, kind, angle):
 # a single small image: 3 groups + the hour tick + the minute tick.
 GROUP_BOX = 56      # px, square
 GROUP_R = 113       # radius of the circle the group's middle tick sits on
-GROUP_TICK = 3      # px tall, ending on the rim
+GROUP_TICK = 5      # px tall, ending on the rim
 
 
 def group_origin(first_step):

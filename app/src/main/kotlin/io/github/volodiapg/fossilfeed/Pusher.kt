@@ -15,7 +15,7 @@ object Pusher {
     private const val MAX_EVENTS = 4
 
     // Text that fits the watch: the location is one line, title and description share up to three lines
-    // (about 20 characters a line). Longer text gets "..." in the middle, so both its start and end stay readable.
+    // (about 20 characters a line). Longer text loses words in the middle for " ... ", so its start and end stay readable.
     private const val MAX_LOCATION = 20
     private const val MAX_TITLE = 26
     private const val MAX_DESC = 24
@@ -112,15 +112,32 @@ object Pusher {
             .put("end", endSeconds)
 
     /**
-     * Plain ASCII, whitespace collapsed, shortened to [max] characters with "..." in the middle.
+     * Plain ASCII, whitespace collapsed, shortened to [max] characters by dropping words in the middle for " ... ".
      * The watch drops a whole update that contains a non-ASCII character, so accents are removed here.
      */
     internal fun fit(text: String?, max: Int): String {
         val clean = ascii(text ?: "").replace(Regex("\\s+"), " ").trim()
         if (clean.length <= max) return clean
-        val keep = max - 3
-        val head = (keep + 1) / 2
-        return clean.take(head) + "..." + clean.takeLast(keep - head)
+        // keep whole words from both ends: "Bring the ... charger". A single long word is cut by characters instead.
+        val keep = max - 5  // room for " ... "
+        val headMax = (keep + 1) / 2
+        val tailMax = keep - headMax
+        val words = clean.split(" ")
+        var head = ""
+        for (w in words) {
+            val next = if (head.isEmpty()) w else "$head $w"
+            if (next.length > headMax) break
+            head = next
+        }
+        var tail = ""
+        for (w in words.asReversed()) {
+            val next = if (tail.isEmpty()) w else "$w $tail"
+            if (next.length > tailMax) break
+            tail = next
+        }
+        if (head.isEmpty()) head = clean.take(headMax)
+        if (tail.isEmpty()) tail = clean.takeLast(tailMax)
+        return "$head ... $tail"
     }
 
     private val replacements = mapOf(
