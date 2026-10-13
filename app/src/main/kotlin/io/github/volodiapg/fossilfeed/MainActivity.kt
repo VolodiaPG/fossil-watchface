@@ -82,6 +82,10 @@ class MainActivity : Activity() {
                 addView(test)
                 addView(TextView(this@MainActivity).apply { text = "\n3D print time left (replaces the distance while printing)"; textSize = 16f })
                 listOf(url, token, entity, route, path, unit, save).forEach { addView(it) }
+                addView(TextView(this@MainActivity).apply {
+                    text = "If the test fails with EPERM (operation not permitted), allow Local network access for Fossil Feed in the phone's app settings."
+                    textSize = 13f
+                })
             })
         })
         PushJobService.schedule(this)
