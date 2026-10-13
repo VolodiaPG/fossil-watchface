@@ -46,6 +46,8 @@ class MainActivity : Activity() {
         val entity = field("Entity (sensor.printer_time_remaining)", "entity")
         val route = field("Route, {entity} is replaced", "route", default = HomeAssistant.DEFAULT_ROUTE)
         val path = field("Value in the answer, dot separated (state, attributes.remaining)", "path", default = HomeAssistant.DEFAULT_PATH)
+        val statusEntity = field("Status entity, optional (sensor.printer_status)", "statusEntity")
+        val statusValues = field("States meaning it is printing, comma separated (printing)", "statusValues")
         val unit = Spinner(this).apply {
             adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, HomeAssistant.Unit.values().map { it.label })
             setSelection(HomeAssistant.Unit.values().indexOfFirst { it.name == HomeAssistant.raw(this@MainActivity, "unit") }.coerceAtLeast(0))
@@ -56,6 +58,7 @@ class MainActivity : Activity() {
                 HomeAssistant.save(
                     this@MainActivity, url.text.toString(), token.text.toString(), entity.text.toString(),
                     route.text.toString(), path.text.toString(), HomeAssistant.Unit.values()[unit.selectedItemPosition],
+                    statusEntity.text.toString(), statusValues.text.toString(),
                 )
                 Thread {
                     val line = try {
@@ -81,7 +84,7 @@ class MainActivity : Activity() {
                 addView(push)
                 addView(test)
                 addView(TextView(this@MainActivity).apply { text = "\n3D print time left (replaces the distance while printing)"; textSize = 16f })
-                listOf(url, token, entity, route, path, unit, save).forEach { addView(it) }
+                listOf(url, token, entity, route, path, unit, statusEntity, statusValues, save).forEach { addView(it) }
                 addView(TextView(this@MainActivity).apply {
                     text = "If the test fails with EPERM (operation not permitted), allow Local network access for Fossil Feed in the phone's app settings."
                     textSize = 13f

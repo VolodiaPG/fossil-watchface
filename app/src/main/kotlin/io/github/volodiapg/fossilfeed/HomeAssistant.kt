@@ -25,6 +25,8 @@ object HomeAssistant {
         val route: String,    // path after the base address; {entity} is replaced
         val path: String,     // where the value sits in the JSON answer, dot separated
         val unit: Unit,
+        val statusEntity: String,  // optional: a second entity telling whether the printer is running
+        val statusValues: List<String>,  // its states that count as running, e.g. printing
     )
 
     const val DEFAULT_ROUTE = "/api/states/{entity}"
@@ -43,13 +45,17 @@ object HomeAssistant {
             p.getString("route", DEFAULT_ROUTE).orEmpty().ifBlank { DEFAULT_ROUTE },
             p.getString("path", DEFAULT_PATH).orEmpty().ifBlank { DEFAULT_PATH },
             Unit.values().firstOrNull { it.name == p.getString("unit", null) } ?: Unit.MINUTES,
+            p.getString("statusEntity", "").orEmpty().trim(),
+            p.getString("statusValues", "").orEmpty().split(',').map { it.trim().lowercase() }.filter { it.isNotEmpty() },
         )
     }
 
-    fun save(ctx: Context, url: String, token: String, entity: String, route: String, path: String, unit: Unit) {
+    fun save(ctx: Context, url: String, token: String, entity: String, route: String, path: String, unit: Unit,
+             statusEntity: String, statusValues: String) {
         ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putString("url", url).putString("token", token).putString("entity", entity)
-            .putString("route", route).putString("path", path).putString("unit", unit.name).apply()
+            .putString("route", route).putString("path", path).putString("unit", unit.name)
+            .putString("statusEntity", statusEntity).putString("statusValues", statusValues).apply()
     }
 
     /** The saved fields as typed, for the settings screen. */
@@ -58,12 +64,13 @@ object HomeAssistant {
 
     /**
      * Unix seconds when the print ends, 0 when nothing is printing (no value, "unknown", nothing left),
-     * null when Home Assistant is not set up. Throws when it cannot be reached or answers an error.
+     * null when Home Assistant is not set up. With a status entity set, anything but its running states counts as no print. Throws when it cannot be reached or answers an error.
      */
     fun printEnd(ctx: Context, nowMs: Long): Long? {
         val s = settings(ctx) ?: return null
-        val value = read(s)
         val now = nowMs / 1000
+        if (s.statusEntity.isNotEmpty() && read(s, s.statusEntity, "state")?.lowercase() !in s.statusValues) return 0L
+        val value = read(s, s.entity, s.path)
         val end = when (s.unit) {
             Unit.END_TIME -> value?.let(::parseTime)
             Unit.SECONDS -> value?.toDoubleOrNull()?.let { now + it.toLong() }
@@ -79,17 +86,19 @@ object HomeAssistant {
         try { Instant.parse(text).epochSecond } catch (e2: Exception) { null }
     }
 
-    private fun read(s: Settings): String? {
-        val route = s.route.replace("{entity}", s.entity)
+    /** The value at [path] in the answer for [entity]; null when absent or when Home Assistant does not know the entity (404). */
+    private fun read(s: Settings, entity: String, path: String): String? {
+        val route = s.route.replace("{entity}", entity)
         val conn = URL(s.url.trimEnd('/') + (if (route.startsWith("/")) route else "/$route")).openConnection() as HttpURLConnection
         try {
             conn.connectTimeout = TIMEOUT_MS
             conn.readTimeout = TIMEOUT_MS
             if (s.token.isNotEmpty()) conn.setRequestProperty("Authorization", "Bearer ${s.token}")
+            if (conn.responseCode == 404) return null
             if (conn.responseCode !in 200..299) throw java.io.IOException("Home Assistant answered ${conn.responseCode}")
             val body = conn.inputStream.bufferedReader().use { it.readText() }
             var node: Any? = if (body.trimStart().startsWith("[")) JSONArray(body) else JSONObject(body)
-            for (key in s.path.split('.')) {
+            for (key in path.split('.')) {
                 val current = node
                 node = when (current) {
                     is JSONObject -> current.opt(key)
