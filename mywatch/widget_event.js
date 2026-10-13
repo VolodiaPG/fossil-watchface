@@ -1,7 +1,7 @@
 return {
     node_name: '',
     manifest: {
-        timers: [],
+        timers: ['change'],
     },
     persist: {},
     config: {
@@ -15,9 +15,30 @@ return {
             this.store_events();
             this.store_alarm();
             this.draw(response);
-        } else if ((event.type === 'watch_face_update') || (event.type === 'display_data_updated')) {
+            this.schedule();
+        } else if ((event.type === 'watch_face_update') || (event.type === 'display_data_updated')
+                || ((event.type === 'timer_expired') && is_this_timer_expired(event, this.node_name, 'change'))) {
             this.draw(response);
+            this.schedule();
         }
+    },
+    // Wakes the widget when what it shows changes on its own (an event starts or ends, the alarm rings or comes
+    // within 24 hours, midnight): its redraw makes the face do a partial refresh, like the weather widget does.
+    schedule: function() {
+        var now = this.unix_time();
+        var offset = this.tz_offset();
+        var next = 86400 * (Math.floor((now + offset) / 86400) + 1) - offset;  // midnight
+        var times = [this.alarm, this.alarm - 86400];
+        for (var i in this.events) {
+            times.push(this.events[i][0], this.events[i][1]);
+        }
+        for (var j in times) {
+            if (times[j] > now && times[j] < next) {
+                next = times[j];
+            }
+        }
+        stop_timer(this.node_name, 'change');
+        start_timer(this.node_name, 'change', (Math.min(next - now, 3600) + 1) * 1000);
     },
     // Pushed by the phone app: [{start, end, title, location, desc}], seconds since epoch. Kept compact as [start, end, title, desc, location]
     store_events: function() {

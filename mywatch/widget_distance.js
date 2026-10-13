@@ -1,6 +1,9 @@
 return {
     node_name: '',
     stride_m: 0.75,  // no distance in the watch's data: estimated from today's steps
+    manifest: {
+        timers: ['minute'],
+    },
     config: {
         printer: undefined,
     },
@@ -12,7 +15,8 @@ return {
                 this.config.printer = undefined;
             }
             this.draw(response);
-        } else if ((event.type === 'watch_face_update') || (event.type === 'display_data_updated')) {
+        } else if ((event.type === 'watch_face_update') || (event.type === 'display_data_updated')
+                || ((event.type === 'timer_expired') && is_this_timer_expired(event, this.node_name, 'minute'))) {
             this.draw(response);
         }
     },
@@ -34,6 +38,12 @@ return {
     },
     draw: function(response) {
         var print = this.print_text();
+        stop_timer(this.node_name, 'minute');
+        if (print !== undefined) {
+            // wake when the countdown shows the next minute: the redraw makes the face do a partial refresh
+            var left = this.printer_end - this.unix_time();
+            start_timer(this.node_name, 'minute', ((left - 30) % 60 + 60) % 60 * 1000 + 1000);
+        }
         var icon = 'icPrint';
         var text = print;
         if (print === undefined) {
