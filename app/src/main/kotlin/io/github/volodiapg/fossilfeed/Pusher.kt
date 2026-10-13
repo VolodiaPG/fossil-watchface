@@ -28,12 +28,21 @@ object Pusher {
 
     /** The JSON the watchface expects; times are Unix seconds, alarm is 0 when none is set. */
     fun payload(ctx: Context, nowMs: Long = System.currentTimeMillis()): String =
-        payloadOf(events(ctx, nowMs), nextAlarmSeconds(ctx))
+        payloadOf(events(ctx, nowMs), nextAlarmSeconds(ctx), printEnd(ctx, nowMs))
 
-    private fun payloadOf(events: JSONArray, alarmSeconds: Long): String {
+    /** Home Assistant is optional and may be unreachable: then the key is left out and the watch keeps its last value. */
+    private fun printEnd(ctx: Context, nowMs: Long): Long? = try {
+        HomeAssistant.printEnd(ctx, nowMs).also { ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().remove("haError").apply() }
+    } catch (e: Exception) {
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString("haError", e.message ?: e.javaClass.simpleName).apply()
+        null
+    }
+
+    private fun payloadOf(events: JSONArray, alarmSeconds: Long, printEnd: Long? = null): String {
         val set = JSONObject()
             .put("widgetEvent._.config.events", events)
             .put("widgetEvent._.config.alarm", alarmSeconds)
+        if (printEnd != null) set.put("widgetDistance._.config.printer", printEnd)
         return JSONObject().put("res", JSONObject().put("set", set)).toString()
     }
 
@@ -62,7 +71,8 @@ object Pusher {
             prefs.edit().putString("last", json).putLong("lastAt", now).apply()
             "Sent ${json.length} bytes"
         }
-        val line = "${java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT).format(now)}: $status"
+        val haError = prefs.getString("haError", null)?.let { " (Home Assistant: $it)" }.orEmpty()
+        val line = "${java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT).format(now)}: $status$haError"
         prefs.edit().putString("status", line).apply()
         return line
     }

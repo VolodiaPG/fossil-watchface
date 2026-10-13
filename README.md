@@ -2,10 +2,10 @@
 
 Shows your next calendar event of the day as ticks on the dial rim, plus date, battery, weather and distance.
 
-- **Minutes:** one long tick, with 15 small ticks leading up to it, tapering in three sizes.
+- **Minutes:** one long tick, with 15 small ticks leading up to it.
 - **Hours:** one short tick with a dot.
 
-It comes with a small phone app, Fossil Feed, that sends the watch your events (with location) and your next alarm.
+It comes with a small phone app, Fossil Feed, that sends the watch your events (with location), your next alarm and, optionally, the time left on a 3D print from Home Assistant.
 
 ## Install
 
@@ -22,6 +22,7 @@ Requires Gadgetbridge 0.94 or later, with the watch already paired. Both files a
 - **Updates:** the app pushes every 15 minutes and shortly after the calendar changes, but only when something changed. The watch forgets its data when the face is reinstalled, so tap *Push to watch now* then.
 - **Weather:** needs a phone weather app that feeds Gadgetbridge (e.g. Breezy). Without it the widget shows `– –`.
 - **Distance:** estimated from today's steps at 0.75 m each.
+- **3D print:** while a print runs, the distance bubble shows the time left (`1h05`, `42m`) with a printer icon. In the app, fill in the Home Assistant address, a long-lived access token (profile page in Home Assistant), the entity, the route (default `/api/states/{entity}`), where the value sits in the answer (default `state`, or e.g. `attributes.remaining`) and whether it is seconds, minutes, hours or an end time, then tap *Save Home Assistant and test*. The phone must reach Home Assistant; plain `http://` is allowed. If Home Assistant cannot be reached, the watch keeps its last value.
 - **Battery:** a small tab under the date appears at 30% or below.
 
 ## Build it yourself

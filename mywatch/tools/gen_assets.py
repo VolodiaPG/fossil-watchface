@@ -163,6 +163,21 @@ def distance_icon(name, size=24):
     finish(img, size, name)
 
 
+def printer_icon(name, size=24):
+    """3D printer: frame with a nozzle over a part on the bed."""
+    big = size * S
+    img = Image.new('RGBA', (big, big), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    w = (255, 255, 255, 255)
+    cut = (0, 0, 0, 0)
+    d.rounded_rectangle([2 * S, 2 * S, 22 * S, 22 * S], radius=2 * S, fill=w)
+    d.rectangle([4 * S, 4 * S, 20 * S, 20 * S], fill=cut)                    # window, leaves a 2 px frame
+    d.rectangle([4 * S, 7 * S, 20 * S, 9 * S], fill=w)                       # gantry
+    d.polygon([(10 * S, 9 * S), (14 * S, 9 * S), (12 * S, 13 * S)], fill=w)  # nozzle
+    d.rectangle([9 * S, 16 * S, 15 * S, 20 * S], fill=w)                     # part on the bed
+    finish(img, size, name)
+
+
 DATE_BOX = (141, 106, 70, 28)  # x, y, w, h of the rounded rectangle behind the date
 
 
@@ -198,6 +213,7 @@ for i in range(60):
     group_icon('icG%d' % i, i)  # 5 small ticks, the first one at minute i
 widget_bubble('bgCircle')
 distance_icon('icDist')
+printer_icon('icPrint')
 alarm_icon('icAlarm')
 for i in range(9):
     battery_indicator('icBat%d' % i, i)
