@@ -18,7 +18,8 @@ return {
     timeout_partial_display_update: 15 * 60 * 1000,
     timeout_full_display_update: 60 * 60 * 1000,
     full_refresh_needed: false,
-    powersave_display: false,
+    partial_since_full: false,
+    powersave_display: true,
     powersave_hands: false,
     time_telling_enabled: true,
     wrist_flick_display_timeout: 5000,
@@ -95,6 +96,7 @@ return {
             update_type: this.full_refresh_needed ? 'gc4' : 'du4',
             skip_invert: true,
         };
+        this.partial_since_full = !this.full_refresh_needed;
         this.full_refresh_needed = false;
         var counter = 0;
         for (var key in this.config.layout) {
@@ -459,7 +461,10 @@ return {
                                 self.time_telling_enabled = true;
                             }
                             if ((!get_common().device_offwrist) && (self.powersave_display)) {
-                                // only redraw if display was saving power
+                                // only redraw if display was saving power, with fresh widget data
+                                self.update_complications({
+                                    type: 'display_data_updated',
+                                });
                                 redraw_needed = true;
                             }
                         } else if(event.type == 'timer_expired') {
@@ -476,21 +481,26 @@ return {
                                 // first level action fulfilled, show watch
                                 self.full_refresh_needed = true;
                                 self.draw_watch(response);
-                            } else if(!self.powersave_display && !get_common().device_offwrist){
-                                if (is_this_timer_expired(event, self.node_name, 'update_partial')) {
-                                    // Timer for partial display updates expired
+                            } else if (is_this_timer_expired(event, self.node_name, 'update_partial')) {
+                                // Timer for partial display updates expired: always rearmed, so the updates resume
+                                // after the watch was off the wrist
+                                start_timer(self.node_name, 'update_partial', self.timeout_partial_display_update);
+                                if (should_update_display) {
                                     redraw_needed = self.update_complications({
                                         type: 'display_data_updated',
                                     });
-                                    start_timer(self.node_name, 'update_partial', self.timeout_partial_display_update);
-                                } else if (is_this_timer_expired(event, self.node_name, 'update_full')) {
-                                    // Timer for full display updates expired
-                                    redraw_needed = true;
-                                    self.update_complications({
+                                }
+                            } else if (is_this_timer_expired(event, self.node_name, 'update_full')) {
+                                // Timer for full display updates expired: the full refresh only clears the ghosting
+                                // partial updates leave, so it is skipped when there was none
+                                start_timer(self.node_name, 'update_full', self.timeout_full_display_update);
+                                if (should_update_display) {
+                                    redraw_needed = self.update_complications({
                                         type: 'display_data_updated',
-                                    });
-                                    self.full_refresh_needed = true;
-                                    start_timer(self.node_name, 'update_full', self.timeout_full_display_update);
+                                    }) || self.partial_since_full;
+                                    if (redraw_needed) {
+                                        self.full_refresh_needed = true;
+                                    }
                                 }
                             }
                         } else if (event.type == 'display_data_updated' && should_update_display) {
@@ -531,8 +541,11 @@ return {
         if (get_common().U('DIAL_INFO') === 'ON') {
             for (var index in need_update) {
                 if (typeof(need_update[index].draw) === 'object') {
-                    result = true;
                     for (var index2 in need_update[index].draw) {
+                        // a widget redrawing what it already shows does not refresh the display
+                        if (JSON.stringify(need_update[index].draw[index2]) !== JSON.stringify(this.complications.draw[index2])) {
+                            result = true;
+                        }
                         this.complications.draw[index2] = need_update[index].draw[index2];
                     }
                 }

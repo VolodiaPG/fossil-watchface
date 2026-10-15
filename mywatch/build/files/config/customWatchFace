@@ -64,7 +64,7 @@
   "wrist_flick_duration": 2200,
   "wrist_flick_move_hour": 360,
   "wrist_flick_move_minute": -360,
-  "powersave_display": false,
+  "powersave_display": true,
   "powersave_hands": false,
   "light_up_on_notification": true
  }

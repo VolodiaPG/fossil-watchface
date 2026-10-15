@@ -26,13 +26,18 @@ return {
         }
         return get_unix_time();
     },
+    // seconds between two values of the print countdown: 5 minutes from an hour left, to refresh the display less
+    print_step: function(left) {
+        return left >= 3450 ? 300 : 60;
+    },
     // "1h05" or "42m" while a print is running, else undefined
     print_text: function() {
         var left = this.printer_end - this.unix_time();
         if (!(left > 0)) {
             return undefined;
         }
-        var mins = Math.max(1, Math.round(left / 60));
+        var step = this.print_step(left);
+        var mins = Math.max(1, Math.round(left / step) * step / 60);
         var mm = mins % 60;
         return mins >= 60 ? Math.floor(mins / 60) + 'h' + (mm < 10 ? '0' + mm : mm) : mins + 'm';
     },
@@ -40,9 +45,10 @@ return {
         var print = this.print_text();
         stop_timer(this.node_name, 'minute');
         if (print !== undefined) {
-            // wake when the countdown shows the next minute: the redraw makes the face do a partial refresh
+            // wake when the countdown shows its next value: the redraw makes the face do a partial refresh
             var left = this.printer_end - this.unix_time();
-            start_timer(this.node_name, 'minute', ((left - 30) % 60 + 60) % 60 * 1000 + 1000);
+            var step = this.print_step(left);
+            start_timer(this.node_name, 'minute', ((left - step / 2) % step + step) % step * 1000 + 1000);
         }
         var icon = 'icPrint';
         var text = print;
