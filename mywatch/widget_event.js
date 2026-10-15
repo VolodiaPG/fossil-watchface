@@ -190,8 +190,8 @@ return {
                 out.atxt = alarm;
             }
         }
-        // vertical placement: wrapped lines are estimated from the text length (about 20 characters a line)
-        var rows = (out.l1 ? 1 : 0) + (out.l2 ? Math.min(3, Math.ceil(out.l2.length / 20)) : 0);
+        // vertical placement: wrapped lines are estimated from the text length (about 18 characters a line)
+        var rows = (out.l1 ? 1 : 0) + (out.l2 ? Math.min(3, Math.ceil(out.l2.length / 18)) : 0);
         var top = this.field_top + Math.max(0, Math.round((this.field_height - rows * this.line_height) / 2));
         out.l1y = top;
         out.l2y = top + (out.l1 ? this.line_height : 0);
