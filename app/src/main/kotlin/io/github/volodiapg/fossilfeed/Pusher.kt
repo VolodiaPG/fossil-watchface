@@ -18,7 +18,7 @@ object Pusher {
     // (about 20 characters a line). Longer text loses words in the middle for " ... ", so its start and end stay readable.
     private const val MAX_LOCATION = 20
     private const val MAX_TITLE = 26
-    private const val MAX_DESC = 23
+    private const val MAX_DESC = 21
     private const val RESEND_AFTER_MS = 6 * 60 * 60 * 1000L
 
     private const val PREFS = "fossilfeed"
