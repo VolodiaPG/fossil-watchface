@@ -125,7 +125,7 @@ return {
     // the text field under the date: lines are centred vertically in it
     field_top: 152,
     field_height: 64,
-    line_height: 19,
+    line_height: 16,  // the watch's own line spacing at 16 ppem
     day_of_week: ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'],
     draw: function(response) {
         var e = this.next_event();
@@ -190,11 +190,14 @@ return {
                 out.atxt = alarm;
             }
         }
-        // vertical placement: wrapped lines are estimated from the text length (about 18 characters a line)
-        var rows = (out.l1 ? 1 : 0) + (out.l2 ? Math.min(3, Math.ceil(out.l2.length / 18)) : 0);
+        // vertical placement: wrapped lines are estimated from the text length (about 21 characters a line). The
+        // watch centres text vertically in its box, so the second box is as tall as its estimated lines.
+        var l2rows = out.l2 ? Math.min(3, Math.ceil(out.l2.length / 21)) : 0;
+        var rows = (out.l1 ? 1 : 0) + l2rows;
         var top = this.field_top + Math.max(0, Math.round((this.field_height - rows * this.line_height) / 2));
         out.l1y = top;
         out.l2y = top + (out.l1 ? this.line_height : 0);
+        out.l2h = Math.max(1, l2rows) * this.line_height;
         if (out.showalarm) {  // one row of 22 px centred in the field; the bell sits 4 px lower than the text row
             out.aty = this.field_top + Math.round((this.field_height - 22) / 2);
             out.aiy = out.aty + 4;
