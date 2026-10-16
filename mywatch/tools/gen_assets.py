@@ -136,7 +136,7 @@ def shadowed(draw_shape, w, h):
     mask = Image.new('L', (bw, bh), 0)
     draw_shape(ImageDraw.Draw(mask), 255)
     lit = Image.new('L', (bw, bh), 0)
-    lit.paste(mask, (int(1.5 * S), 3 * S))  # same shape moved down-right (no wrap-around)
+    lit.paste(mask, (3 * S, 6 * S))  # same shape moved down-right (no wrap-around)
     crescent = ImageChops.subtract(mask, lit)             # remains on the top / top-left rim
     shade = Image.new('L', (bw, bh), 255)
     shade.paste(GREY, mask=crescent)
